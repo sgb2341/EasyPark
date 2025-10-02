@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>EasyPark</title>
+	<link rel="stylesheet" href="easypark.css">
+	<link href="https://fonts.googleapis.com/css?family=Barlow:400,700&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Orbitron:700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caudex:ital,wght@0,400;0,700;1,400;1,700&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+</head>
+<body>
+	<div class="container">
+		<h1>GREETINGS RIDER!</h1>
+		<div class="subtitle special-font">CHOOSE YOUR VEHICLE</div>
+		<div class="vehicle-options vertical">
+			<div class="vehicle" id="twoWheeler" onclick="selectVehicle('2')">
+				Two-Wheeler
+			</div>
+			<div class="vehicle" id="fourWheeler" onclick="selectVehicle('4')">
+				Four-Wheeler
+			</div>
+		</div>
+	<button class="confirm-btn" id="confirmBtn" onclick="confirmVehicle()">Confirm</button>
+	</div>
+	<script>
+		let selected = null;
+		function selectVehicle(type) {
+			selected = type;
+			document.getElementById('twoWheeler').classList.remove('selected');
+			document.getElementById('fourWheeler').classList.remove('selected');
+			if(type === '2') {
+				document.getElementById('twoWheeler').classList.add('selected');
+			} else {
+				document.getElementById('fourWheeler').classList.add('selected');
+			}
+			document.getElementById('confirmBtn').style.display = 'inline-block';
+		}
+		function confirmVehicle() {
+			// Navigate to Page 2 (places list)
+			window.location.href = 'places.html';
+		}
+	</script>
+</body>
+</html>
