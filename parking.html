@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EasyPark - Parking</title>
+  <link rel="stylesheet" href="easypark.css">
+  <style>
+    .slots { display:flex; gap:12px; flex-direction:column; max-width:520px; margin:18px auto; }
+    .slot { background: rgba(255,255,255,0.06); padding:12px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; }
+    .slot.free { border: 2px solid #4caf50; }
+    .slot.occ { border: 2px solid #f44336; opacity:0.95 }
+    .slot button { padding:8px 12px; border:none; border-radius:8px; cursor:pointer; }
+    .slot h4 { margin:0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Parking Availability</h2>
+    <p id="destInfo">Destination: --</p>
+    <div class="slots" id="slotsRoot"></div>
+  </div>
+
+  <script>
+    // Mock sensor data: two ultrasonic sensors -> two slots
+    // true = occupied, false = free
+    let mockSensors = [false, false]; // change these to test
+
+    // Read query params for destination
+    const params = new URLSearchParams(window.location.search);
+    const dest = params.get('dest') || 'Selected place';
+    document.getElementById('destInfo').textContent = 'Destination: ' + dest;
+
+    function renderSlots(){
+      const root = document.getElementById('slotsRoot');
+      root.innerHTML = '';
+      mockSensors.forEach((occupied, i)=>{
+        const div = document.createElement('div');
+        div.className = 'slot ' + (occupied? 'occ' : 'free');
+        div.innerHTML = `<div><h4>Slot ${i+1}</h4><div>${occupied? 'Occupied' : 'Free'}</div></div>`;
+        const btn = document.createElement('button');
+        btn.textContent = occupied? 'View' : 'Navigate';
+        btn.onclick = function(){
+          if(occupied){ alert('Slot occupied'); return; }
+          // navigate to slot (simple: open Google Maps using dest coordinates if provided)
+          // For demo we'll just alert and simulate navigation
+          alert('Navigating to slot ' + (i+1));
+        };
+        div.appendChild(btn);
+        root.appendChild(div);
+      });
+
+      // Decide nearest available slot and highlight it
+      const freeIndexes = mockSensors.map((v,i)=>!v? i : -1).filter(i=>i>=0);
+      if(freeIndexes.length){
+        const firstFree = freeIndexes[0];
+        const highlight = root.children[firstFree];
+        highlight.style.boxShadow = '0 8px 20px rgba(33,150,243,0.25)';
+      }
+    }
+
+    renderSlots();
+  </script>
+</body>
+</html>

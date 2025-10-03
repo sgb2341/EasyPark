@@ -75,6 +75,19 @@
         <iframe id="mapFrame" src="" width="400" height="350" style="border:0;display:block;max-width:90vw;max-height:70vh;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
     </div>
+        <!-- In-page navigation overlay -->
+        <div id="navOverlay" style="display:none;position:fixed;z-index:10000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:12px;padding:16px;max-width:420px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,0.3);position:relative;">
+                <button id="closeNavOverlay" style="position:absolute;top:8px;right:8px;background:#283593;color:#fff;border:none;border-radius:50%;width:32px;height:32px;font-size:1.2rem;cursor:pointer;">&times;</button>
+                <h3 id="navTitle">Navigation</h3>
+                <p id="navStatus">Prepare to navigate</p>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button id="startNavBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:#1976d2;color:#fff;cursor:pointer;">Start navigation</button>
+                    <button id="stopNavBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:#e0e0e0;color:#222;cursor:pointer;display:none;">Stop</button>
+                </div>
+                <p style="margin-top:12px;font-size:0.95rem;">Distance to destination: <span id="navDistance">—</span> meters</p>
+            </div>
+        </div>
     <script>
         // Search/filter functionality for places
         (function(){
@@ -119,7 +132,7 @@
             searchInput.addEventListener('keyup', function(e){ if(e.key === 'Enter') filterCards(); });
         })();
 
-        // Modal map popup for AirBNB 1 and 2
+                // Modal map popup for AirBNB 1 and 2
         document.querySelectorAll('.place-link[data-map]').forEach(function(link){
           link.addEventListener('click', function(e){
             e.preventDefault();
@@ -141,6 +154,82 @@
             document.getElementById('mapFrame').src = '';
           }
         });
+
+                // In-site navigation flow
+                (function(){
+                    var currentWatchId = null;
+                    var destLat = null, destLng = null, destName = '';
+                    var reachThreshold = 15; // meters
+
+                    function toMeters(distance){ return Math.round(distance); }
+
+                    function haversine(lat1, lon1, lat2, lon2){
+                        function toRad(x){ return x * Math.PI / 180; }
+                        var R = 6371000; // meters
+                        var dLat = toRad(lat2-lat1);
+                        var dLon = toRad(lon2-lon1);
+                        var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)*Math.sin(dLon/2);
+                        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                        return R * c;
+                    }
+
+                    document.querySelectorAll('.place-link[data-lat][data-lng]').forEach(function(el){
+                        el.addEventListener('dblclick', function(e){
+                            // dblclick opens modal; single click used to open nav overlay
+                        });
+                        el.addEventListener('click', function(e){
+                            e.preventDefault();
+                            destLat = parseFloat(el.dataset.lat);
+                            destLng = parseFloat(el.dataset.lng);
+                            destName = el.dataset.name || 'Destination';
+                            document.getElementById('navTitle').textContent = 'Navigate to ' + destName;
+                            document.getElementById('navStatus').textContent = 'Ready to start navigation';
+                            document.getElementById('navDistance').textContent = '—';
+                            document.getElementById('startNavBtn').style.display = 'inline-block';
+                            document.getElementById('stopNavBtn').style.display = 'none';
+                            document.getElementById('navOverlay').style.display = 'flex';
+                        });
+                    });
+
+                    document.getElementById('closeNavOverlay').onclick = function(){
+                        stopNav();
+                        document.getElementById('navOverlay').style.display = 'none';
+                    };
+
+                    document.getElementById('startNavBtn').onclick = function(){
+                        if(!destLat || !destLng) return;
+                        this.style.display = 'none';
+                        document.getElementById('stopNavBtn').style.display = 'inline-block';
+                        document.getElementById('navStatus').textContent = 'Starting GPS...';
+                        if(navigator.geolocation){
+                            currentWatchId = navigator.geolocation.watchPosition(function(pos){
+                                var lat = pos.coords.latitude, lng = pos.coords.longitude;
+                                var dist = haversine(lat,lng,destLat,destLng);
+                                document.getElementById('navDistance').textContent = toMeters(dist);
+                                document.getElementById('navStatus').textContent = 'Navigating — GPS active';
+                                if(dist <= reachThreshold){
+                                    stopNav();
+                                    // arrived -> goto parking.html
+                                    window.location.href = 'parking.html?dest='+encodeURIComponent(destName)+'&lat='+destLat+'&lng='+destLng;
+                                }
+                            }, function(err){
+                                document.getElementById('navStatus').textContent = 'GPS error: ' + (err.message||err.code);
+                            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                        } else {
+                            document.getElementById('navStatus').textContent = 'Geolocation not supported';
+                        }
+                    };
+
+                    document.getElementById('stopNavBtn').onclick = function(){ stopNav(); };
+
+                    function stopNav(){
+                        if(currentWatchId !== null && navigator.geolocation){ navigator.geolocation.clearWatch(currentWatchId); }
+                        currentWatchId = null;
+                        document.getElementById('startNavBtn').style.display = 'inline-block';
+                        document.getElementById('stopNavBtn').style.display = 'none';
+                        document.getElementById('navStatus').textContent = 'Navigation stopped';
+                    }
+                })();
     </script>
 </body>
 </html>
