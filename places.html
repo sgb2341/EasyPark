@@ -75,6 +75,17 @@
         <iframe id="mapFrame" src="" width="400" height="350" style="border:0;display:block;max-width:90vw;max-height:70vh;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
     </div>
+    <!-- Action sheet for place actions -->
+    <div id="placeActionSheet" style="display:none;position:fixed;z-index:10001;left:0;bottom:0;width:100vw;background:rgba(255,255,255,0.98);box-shadow:0 -8px 24px rgba(0,0,0,0.15);padding:12px;border-top-left-radius:12px;border-top-right-radius:12px;">
+        <div style="max-width:760px;margin:0 auto;">
+            <div id="actionTitle" style="font-weight:700;margin-bottom:8px">Place</div>
+            <div style="display:flex;gap:8px;flex-direction:column;">
+                <button id="openMapsBtn" style="padding:12px;border-radius:8px;border:none;background:#1976d2;color:#fff;cursor:pointer">Open in Google Maps (directions)</button>
+                <button id="inPageNavBtn" style="padding:12px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#222;cursor:pointer">In-page navigation</button>
+                <button id="closeActionSheet" style="padding:10px;border-radius:8px;border:none;background:#eee;color:#222;cursor:pointer">Cancel</button>
+            </div>
+        </div>
+    </div>
         <!-- In-page navigation overlay -->
         <div id="navOverlay" style="display:none;position:fixed;z-index:10000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
             <div style="background:#fff;border-radius:12px;padding:16px;max-width:420px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,0.3);position:relative;">
@@ -132,17 +143,17 @@
             searchInput.addEventListener('keyup', function(e){ if(e.key === 'Enter') filterCards(); });
         })();
 
-                // Modal map popup for AirBNB 1 and 2
-        document.querySelectorAll('.place-link[data-map]').forEach(function(link){
-          link.addEventListener('click', function(e){
-            e.preventDefault();
-            var mapUrl = link.getAttribute('data-map');
-            var modal = document.getElementById('mapModal');
-            var frame = document.getElementById('mapFrame');
-            frame.src = mapUrl;
-            modal.style.display = 'flex';
-          });
-        });
+                        // Modal map popup for AirBNB 1 and 2 (kept for embed view)
+                        document.querySelectorAll('.place-link[data-map]').forEach(function(link){
+                            link.addEventListener('dblclick', function(e){
+                                e.preventDefault();
+                                var mapUrl = link.getAttribute('data-map');
+                                var modal = document.getElementById('mapModal');
+                                var frame = document.getElementById('mapFrame');
+                                frame.src = mapUrl;
+                                modal.style.display = 'flex';
+                            });
+                        });
         document.getElementById('closeMapModal').onclick = function(){
           document.getElementById('mapModal').style.display = 'none';
           document.getElementById('mapFrame').src = '';
@@ -173,23 +184,70 @@
                         return R * c;
                     }
 
+                    // Use an action sheet when clicking place links with coordinates
+                    var sheet = document.getElementById('placeActionSheet');
+                    var actionTitle = document.getElementById('actionTitle');
+                    var openMapsBtn = document.getElementById('openMapsBtn');
+                    var inPageNavBtn = document.getElementById('inPageNavBtn');
+                    var closeActionSheet = document.getElementById('closeActionSheet');
+
                     document.querySelectorAll('.place-link[data-lat][data-lng]').forEach(function(el){
-                        el.addEventListener('dblclick', function(e){
-                            // dblclick opens modal; single click used to open nav overlay
-                        });
                         el.addEventListener('click', function(e){
                             e.preventDefault();
                             destLat = parseFloat(el.dataset.lat);
                             destLng = parseFloat(el.dataset.lng);
                             destName = el.dataset.name || 'Destination';
-                            document.getElementById('navTitle').textContent = 'Navigate to ' + destName;
-                            document.getElementById('navStatus').textContent = 'Ready to start navigation';
-                            document.getElementById('navDistance').textContent = '—';
-                            document.getElementById('startNavBtn').style.display = 'inline-block';
-                            document.getElementById('stopNavBtn').style.display = 'none';
-                            document.getElementById('navOverlay').style.display = 'flex';
+                            actionTitle.textContent = 'Actions for ' + destName;
+                            sheet.style.display = 'block';
                         });
                     });
+
+                    closeActionSheet.onclick = function(){ sheet.style.display = 'none'; };
+
+                    openMapsBtn.onclick = function(){
+                        sheet.style.display = 'none';
+                        if(!navigator.geolocation){ alert('Geolocation required to open directions.'); return; }
+                        document.getElementById('navStatus').textContent = 'Resolving current location...';
+                        navigator.geolocation.getCurrentPosition(function(pos){
+                            var olat = pos.coords.latitude, olng = pos.coords.longitude;
+                            // Google Maps directions URL: /maps/dir/?api=1&origin=lat,lng&destination=lat,lng
+                            var url = 'https://www.google.com/maps/dir/?api=1&origin='+olat+','+olng+'&destination='+destLat+','+destLng+'&travelmode=driving';
+                            window.open(url, '_blank');
+                        }, function(err){
+                            alert('Unable to get current location: ' + (err && err.message));
+                        }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                    };
+
+                    inPageNavBtn.onclick = function(){
+                        sheet.style.display = 'none';
+                        // prefill nav overlay and open it, then auto-start
+                        document.getElementById('navTitle').textContent = 'Navigate to ' + destName;
+                        document.getElementById('navStatus').textContent = 'Ready to start navigation';
+                        document.getElementById('navDistance').textContent = '—';
+                        document.getElementById('startNavBtn').style.display = 'none';
+                        document.getElementById('stopNavBtn').style.display = 'inline-block';
+                        document.getElementById('navOverlay').style.display = 'flex';
+                        // Start geolocation watch immediately
+                        if(navigator.geolocation){
+                            if(currentWatchId !== null && navigator.geolocation){ navigator.geolocation.clearWatch(currentWatchId); }
+                            currentWatchId = navigator.geolocation.watchPosition(function(pos){
+                                var lat = pos.coords.latitude, lng = pos.coords.longitude;
+                                var dist = haversine(lat,lng,destLat,destLng);
+                                document.getElementById('navDistance').textContent = toMeters(dist);
+                                document.getElementById('navStatus').textContent = 'Navigating — GPS active';
+                                if(dist <= reachThreshold){
+                                    if(currentWatchId !== null && navigator.geolocation){ navigator.geolocation.clearWatch(currentWatchId); }
+                                    currentWatchId = null;
+                                    // arrived -> goto parking.html
+                                    window.location.href = 'parking.html?dest='+encodeURIComponent(destName)+'&lat='+destLat+'&lng='+destLng;
+                                }
+                            }, function(err){
+                                document.getElementById('navStatus').textContent = 'GPS error: ' + (err.message||err.code);
+                            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 });
+                        } else {
+                            document.getElementById('navStatus').textContent = 'Geolocation not supported';
+                        }
+                    };
 
                     document.getElementById('closeNavOverlay').onclick = function(){
                         stopNav();
